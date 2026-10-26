@@ -11,3 +11,4 @@
 | [Lab-01](./Lab-01) | Базові конструкції, структури даних та конкурентність у Go (HTTP URL Health Checker) | Go (goroutines, channels, sync) |
 | [Lab-02](./Lab-02) | Сокетне програмування та обмін повідомленнями по TCP/UDP (Device & Dispatcher Gateway) | Go (net, TCP/UDP sockets, Broadcast, Graceful Shutdown) |
 | [Lab-03](./Lab-03) | Налаштування захищеного каналу mTLS та протокол SMTP (Secure Alert Gateway) | Go (crypto/tls, PKI X.509, mTLS, net/smtp, MIME, Base64) |
+| [Lab-04](./Lab-04) | Побудова REST API з використанням маршрутизатора Chi (Device Registry API) | Go, Chi v5, REST CRUD, Middleware, RWMutex, RFC 7807 |
