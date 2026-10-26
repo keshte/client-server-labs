@@ -9,3 +9,4 @@
 | Робота | Тема | Стек |
 | :--- | :--- | :--- |
 | [Lab-01](./Lab-01) | Базові конструкції, структури даних та конкурентність у Go (HTTP URL Health Checker) | Go (goroutines, channels, sync) |
+| [Lab-02](./Lab-02) | Сокетне програмування та обмін повідомленнями по TCP/UDP (Device & Dispatcher Gateway) | Go (net, TCP/UDP sockets, Broadcast, Graceful Shutdown) |
