@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Real-Time Operations Gateway | SSE & WebSockets</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #38bdf8;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; }
+    header { margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+    h1 { font-size: 24px; color: var(--primary); }
+    .subtitle { color: var(--muted); font-size: 14px; margin-top: 4px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; }
+    .card h2 { font-size: 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; font-weight: bold; }
+    .badge.green { background: rgba(34,197,94,0.2); color: var(--success); }
+    .badge.blue { background: rgba(56,189,248,0.2); color: var(--primary); }
+    .badge.red { background: rgba(239,68,68,0.2); color: var(--danger); }
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .metric-box { background: rgba(15,23,42,0.6); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+    .metric-val { font-size: 24px; font-weight: bold; color: var(--primary); margin: 6px 0; }
+    .metric-lbl { font-size: 12px; color: var(--muted); }
+    .log-box { background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 12px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.5; flex: 1; }
+    .log-entry { margin-bottom: 6px; }
+    .log-time { color: var(--muted); }
+    .log-room { color: var(--warning); font-weight: bold; }
+    .log-msg { color: #e2e8f0; }
+    .controls { display: flex; gap: 10px; margin-top: 14px; }
+    input, select, button { padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border); background: #0b1120; color: white; font-size: 14px; }
+    input { flex: 1; }
+    button { background: #0284c7; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+    button:hover { background: #0369a1; }
+    button.btn-room { background: #475569; }
+    button.btn-room.active { background: var(--primary); color: #0f172a; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📡 Real-Time Operations Gateway</h1>
+    <div class="subtitle">Практична робота №6 | Студент: Коштура Нікіта Богданович (КН-43) | УжНУ 2026</div>
+  </header>
+
+  <div class="grid">
+    <!-- Блок 1: SSE Телеметрія -->
+    <div class="card">
+      <h2>
+        <span>Однонапрямлена телеметрія (SSE)</span>
+        <span id="sse-badge" class="badge red">Disconnected</span>
+      </h2>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <div class="metric-lbl">Горутини (Goroutines)</div>
+          <div id="m-goroutines" class="metric-val">--</div>
+          <div class="metric-lbl">активні потоки</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-lbl">Пам'ять (RAM Alloc)</div>
+          <div id="m-alloc" class="metric-val">--</div>
+          <div class="metric-lbl">МБ оперативної пам'яті</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-lbl">Час сервера</div>
+          <div id="m-time" class="metric-val" style="font-size: 16px; margin-top: 12px;">--</div>
+          <div class="metric-lbl">UTC / RFC3339</div>
+        </div>
+      </div>
+      <div class="log-box" id="sse-log">
+        <div class="log-entry" style="color: var(--muted);">[Ініціалізація підключення EventSource('/api/v1/metrics/stream')...]</div>
+      </div>
+    </div>
+
+    <!-- Блок 2: WebSocket Оперативний зв'язок -->
+    <div class="card">
+      <h2>
+        <span>Пульт зв'язку (WebSockets Hub)</span>
+        <span id="ws-badge" class="badge red">Disconnected</span>
+      </h2>
+      <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 13px; color: var(--muted);">Кімната:</span>
+        <button class="btn-room active" onclick="switchRoom('alerts')">alerts 🚨</button>
+        <button class="btn-room" onclick="switchRoom('general')">general 💬</button>
+        <button class="btn-room" onclick="switchRoom('ops')">ops 🛠️</button>
+      </div>
+      <div class="log-box" id="ws-log">
+        <div class="log-entry" style="color: var(--muted);">[Виберіть кімнату та підключіться до WebSocket...]</div>
+      </div>
+      <div class="controls">
+        <input type="text" id="ws-input" placeholder="Введіть оперативне повідомлення (Enter для відправки)..." onkeydown="if(event.key==='Enter') sendWsMessage()">
+        <button onclick="sendWsMessage()">Надіслати</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SSE Connection ---
+    const sseLog = document.getElementById('sse-log');
+    const sseBadge = document.getElementById('sse-badge');
+    const es = new EventSource('/api/v1/metrics/stream');
+
+    es.onopen = () => {
+      sseBadge.textContent = 'Streaming LIVE';
+      sseBadge.className = 'badge green';
+      addSseLog('✅ З’єднання SSE встановлено успішно. Отримання метрик щосекунди.');
+    };
+
+    es.onmessage = (e) => {
+      try {
+        const metric = JSON.parse(e.data);
+        document.getElementById('m-goroutines').textContent = metric.goroutines;
+        document.getElementById('m-alloc').textContent = metric.alloc_mb ? metric.alloc_mb.toFixed(2) : (metric.alloc_kb / 1024).toFixed(2);
+        document.getElementById('m-time').textContent = metric.time.split('T')[1].split('+')[0].split('Z')[0];
+
+        addSseLog(`data: {"time":"${metric.time}", "goroutines":${metric.goroutines}, "alloc_kb":${metric.alloc_kb}}`);
+      } catch (err) {}
+    };
+
+    es.onerror = () => {
+      sseBadge.textContent = 'Disconnected';
+      sseBadge.className = 'badge red';
+    };
+
+    function addSseLog(msg) {
+      const row = document.createElement('div');
+      row.className = 'log-entry';
+      row.textContent = msg;
+      sseLog.appendChild(row);
+      sseLog.scrollTop = sseLog.scrollHeight;
+      if (sseLog.children.length > 50) sseLog.removeChild(sseLog.firstChild);
+    }
+
+    // --- 2. WebSocket Connection with Rooms ---
+    let ws;
+    let currentRoom = 'alerts';
+    const wsLog = document.getElementById('ws-log');
+    const wsBadge = document.getElementById('ws-badge');
+    const wsInput = document.getElementById('ws-input');
+
+    function connectWs(room) {
+      if (ws) {
+        ws.close();
+      }
+      currentRoom = room;
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${location.host}/api/v1/ws?room=${room}`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        wsBadge.textContent = `Connected [${room}]`;
+        wsBadge.className = 'badge green';
+        addWsLog(`[СИСТЕМА] Підключено до кімнати [${room}]`);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          addWsLog(`[${msg.time || ''}] [${msg.room}] <${msg.sender}>: ${msg.content}`);
+        } catch (e) {
+          addWsLog(`[${currentRoom}] ${event.data}`);
+        }
+      };
+
+      ws.onclose = () => {
+        wsBadge.textContent = 'Disconnected';
+        wsBadge.className = 'badge red';
+        addWsLog(`[СИСТЕМА] З'єднання розірвано.`);
+      };
+    }
+
+    function switchRoom(room) {
+      document.querySelectorAll('.btn-room').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.includes(room));
+      });
+      connectWs(room);
+    }
+
+    function sendWsMessage() {
+      const text = wsInput.value.trim();
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const payload = {
+        room: currentRoom,
+        sender: 'WebClient-UI',
+        content: text
+      };
+      ws.send(JSON.stringify(payload));
+      wsInput.value = '';
+    }
+
+    function addWsLog(msg) {
+      const row = document.createElement('div');
+      row.className = 'log-entry';
+      row.innerHTML = msg;
+      wsLog.appendChild(row);
+      wsLog.scrollTop = wsLog.scrollHeight;
+    }
+
+    // Auto connect to alerts room on start
+    connectWs('alerts');
+  </script>
+</body>
+</html>

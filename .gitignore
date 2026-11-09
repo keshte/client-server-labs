@@ -12,6 +12,12 @@
 # Go workspace
 go.work
 
+# Databases
+*.db
+*.sqlite
+incidents.db
+test_incidents.db
+
 # OS files
 .DS_Store
 Thumbs.db
